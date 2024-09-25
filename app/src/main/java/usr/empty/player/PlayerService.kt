@@ -8,11 +8,14 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.serialization.json.Json
+import java.util.concurrent.ConcurrentLinkedDeque
 
 
 class PlayerService : MediaSessionService() {
-    private var mediaSession: MediaSession? = null
-    var player: ExoPlayer? = null
+    private lateinit var mediaSession: MediaSession
+    lateinit var player: ExoPlayer
+    private var virtualQueue = ConcurrentLinkedDeque<Nota>()
 
     override fun onCreate() {
         super.onCreate()
@@ -20,26 +23,35 @@ class PlayerService : MediaSessionService() {
             player = this
             mediaSession = MediaSession.Builder(this@PlayerService, this).setCallback(MediaSessionCallback()).build()
         }
-        Log.d("meow", "memememe")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("nya", "start!!!")
         intent?.run {
-
+            if (getStringExtra("check") != "empty") return@run
+            handleCommand(getStringExtra("type")!!, this)
         }
         return super.onStartCommand(intent, flags, startId)
     }
 
-    private fun start() {
-
+    private fun handleCommand(type: String, intent: Intent) {
+        when (type) {
+            "nota" -> {
+                virtualQueue.add(Nota(Json.decodeFromString<NotaDescriptor>(intent.getStringExtra("nota")!!)))
+//                virtualQueue.first.prepare(player)
+                virtualQueue.last.prepare(player)
+                player.prepare()
+                player.play()
+                Log.d("nya", virtualQueue.last.mediaSource.toString())
+            }
+            "pause" -> player.pause()
+            "play" -> player.play()
+        }
     }
 
     override fun onDestroy() {
-        player?.release()
-        mediaSession?.release()
-        player = null
-        mediaSession = null
-        Log.d("meow", "owowowow")
+        player.release()
+        mediaSession.release()
         super.onDestroy()
     }
 
