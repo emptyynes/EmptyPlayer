@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -19,7 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.util.UnstableApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import usr.empty.player.ui.theme.PlayerTheme
@@ -45,6 +47,7 @@ inline fun <T> nullifyException(block: () -> T) = try {
     null
 }
 
+@UnstableApi
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,7 +59,10 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         }
 
-        startService(Intent(this, PlayerService::class.java))
+        startForegroundService(Intent(this, PlayerService::class.java).apply {
+            putExtra("check", "empty")
+            putExtra("type", "start")
+        })
 
         enableEdgeToEdge()
         setContent {
@@ -74,6 +80,7 @@ fun uriToPath(uri: Uri): String {
     return "/storage/" + result.replace("primary:", "/storage/emulated/0/")
 }
 
+@UnstableApi
 @Composable
 fun MainLayout(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -134,20 +141,24 @@ fun MainLayout(modifier: Modifier = Modifier) {
     }
 }
 
+@UnstableApi
 @Composable
-fun NotaList(notas: List<NotaDescriptor>, modifier: Modifier = Modifier) {
+fun NotaList(notas: List<NotaDescriptor>, modifier: Modifier = Modifier, queueId: Int = notas.hashCode()) {
     val context = LocalContext.current
     LazyColumn(
         modifier = modifier,
     ) {
-        items(notas) { nota ->
+        itemsIndexed(notas) { index, nota ->
             Column(modifier = Modifier
                 .fillParentMaxWidth()
                 .clickable {
+                    Log.d("meow", "queueId: $queueId")
                     context.startService(Intent(context, PlayerService::class.java).apply {
                         putExtra("check", "empty")
-                        putExtra("type", "nota")
-                        putExtra("nota", Json.encodeToString(nota))
+                        putExtra("type", "queue")
+                        putExtra("queueId", queueId)
+                        putExtra("queue", Json.encodeToString(notas))
+                        putExtra("start", index)
                     })
                 }
                 .padding(4.dp)
@@ -163,6 +174,7 @@ fun NotaList(notas: List<NotaDescriptor>, modifier: Modifier = Modifier) {
     }
 }
 
+@UnstableApi
 @Preview
 @Composable
 fun Preview() {
