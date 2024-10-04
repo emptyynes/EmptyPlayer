@@ -36,8 +36,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import androidx.room.Room
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import usr.empty.player.database.AppDatabase
+import usr.empty.player.database.Track
 import usr.empty.player.ui.theme.PlayerTheme
 
 
@@ -51,6 +54,12 @@ inline fun <T> nullifyException(block: () -> T) = try {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        //        Log.d("meow", "${filesDir.toPath().resolve("all_tracks.data")}")
+        val db = Room.databaseBuilder(
+            applicationContext, AppDatabase::class.java, "local"
+        ).allowMainThreadQueries().build()
+        Log.d("meow", "${db.trackDao().getAll()}")
 
         if (!Environment.isExternalStorageManager()) {
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
@@ -92,12 +101,21 @@ fun MainLayout(modifier: Modifier = Modifier) {
         audioUri?.run {
             uriToPath(this).let {
                 MediaMetadataRetriever().apply {
-                    setDataSource(it)
-                    notas.add(NotaDescriptor(name = nullifyException {
+                    setDataSource(it) //                    notas.add(NotaDescriptor(name = nullifyException {
+                    //                        extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    //                    } ?: it.split('/').last().split('.').first(), artist = nullifyException {
+                    //                        extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    //                    } ?: "Unknown Artist", sourceType = NotaDescriptor.Source.LOCAL, source = it))
+                    val db = Room.databaseBuilder(
+                        context.applicationContext, AppDatabase::class.java, "local"
+                    ).allowMainThreadQueries().build()
+                    db.trackDao().insertTrack(Track(title = nullifyException {
                         extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                    } ?: it.split('/').last().split('.').first(), artist = nullifyException {
-                        extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                    } ?: "Unknown Artist", sourceType = NotaDescriptor.Source.LOCAL, source = it))
+                    } ?: it.split('/').last().split('.').first(),
+                                                    artistId = 0,
+                                                    albumId = null,
+                                                    sourceType = NotaDescriptor.Source.LOCAL,
+                                                    source = it))
                 }
             }
         }
