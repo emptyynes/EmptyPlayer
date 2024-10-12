@@ -18,21 +18,44 @@ import androidx.media3.session.MediaStyleNotificationHelper
 import androidx.media3.ui.PlayerNotificationManager
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import usr.empty.player.items.NotaDescriptor
 
 
 @UnstableApi
 class PlayerService : MediaSessionService() {
+    companion object {
+        private var _serviceInstance: PlayerService? = null
+
+        val serviceInstance: PlayerService
+            get() = _serviceInstance!!
+
+        var isServiceRunning = false
+    }
+
     private lateinit var mediaSession: MediaSession
     lateinit var player: ExoPlayer
     private lateinit var playerNotificationManager: PlayerNotificationManager
     private val notificationId = 1004
     private var virtualQueue = NotaQueue()
-    private var queueId = -1
+    val currentTrack
+        get() = virtualQueue.current
+    private var queueId = 0
+    var control = Channel<Boolean>()
+    var data = Channel<Pair<Boolean, Float>>()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @SuppressLint("ForegroundServiceType")
     override fun onCreate() {
         super.onCreate()
+        _serviceInstance = this
+        isServiceRunning = true
         player = ExoPlayer.Builder(this).build()
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -49,13 +72,13 @@ class PlayerService : MediaSessionService() {
 
                 override fun createCurrentContentIntent(player: Player) = null
 
-                override fun getCurrentContentText(player: Player) = "context?"
+                override fun getCurrentContentText(player: Player) = "content?"
 
                 override fun getCurrentLargeIcon(player: Player, callback: PlayerNotificationManager.BitmapCallback) = null
             })
             .build()
             .apply {
-                setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                setPriority(NotificationCompat.PRIORITY_MAX)
                 setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 setPlayer(player)
                 setMediaSessionToken(mediaSession.platformToken)
@@ -66,6 +89,16 @@ class PlayerService : MediaSessionService() {
 
         val nBuilder = NotificationCompat.Builder(this, "emptyynes").setStyle(MediaStyleNotificationHelper.MediaStyle(mediaSession))
         startForeground(notificationId, nBuilder.build(), FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+
+        CoroutineScope(SupervisorJob()).launch { //            data.
+            while (true) {
+                while (control.isEmpty) {
+                    data.send(player.isPlaying to (player.currentPosition.toFloat() / player.duration.toFloat()))
+                    delay(if (player.isPlaying) player.duration / 2000 else 33)
+                }
+                if (!control.receive()) break
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
