@@ -11,10 +11,10 @@ import java.util.UUID
 
 @Entity
 data class Album(
-    @ColumnInfo val name: String, @ColumnInfo val artistId: UUID
+    @ColumnInfo val name: String
 ) {
     @PrimaryKey
-    var uuid: UUID = UUID.nameUUIDFromBytes("$name$artistId".toByteArray())
+    var uuid: UUID = UUID.nameUUIDFromBytes(name.toByteArray())
 }
 
 @Dao
